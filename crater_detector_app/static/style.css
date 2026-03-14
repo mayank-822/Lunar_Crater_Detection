@@ -484,3 +484,49 @@ input[type="file"] {
   border: 2px solid #fff;
   box-shadow: 0 0 15px rgba(78, 110, 242, 0.8);
 }
+
+/* --- Tabs System --- */
+.tabs-header {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  flex: 1;
+  min-width: 120px;
+}
+
+.tab-btn:hover {
+  background: rgba(78, 110, 242, 0.1);
+  border-color: rgba(78, 110, 242, 0.3);
+  color: #fff;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, rgba(78, 110, 242, 0.8), rgba(43, 72, 189, 0.8));
+  color: #fff;
+  border-color: var(--primary-color);
+  box-shadow: 0 4px 15px rgba(78, 110, 242, 0.4);
+}
+
+.tab-content {
+  display: none;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.tab-content.active {
+  display: block;
+}

@@ -121,28 +121,38 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update file name display and show image preview when native dialog is used
         fileInput.addEventListener('change', function() {
             if (this.files && this.files.length > 0) {
-                fileNameDisplay.textContent = 'Selected: ' + this.files[0].name;
+                if (this.files.length === 1) {
+                    fileNameDisplay.textContent = 'Selected: ' + this.files[0].name;
+                } else {
+                    fileNameDisplay.textContent = 'Selected ' + this.files.length + ' lunar region images.';
+                }
                 submitBtn.disabled = false;
                 
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    let previewImg = document.getElementById('preview-img');
-                    if (!previewImg) {
-                        previewImg = document.createElement('img');
-                        previewImg.id = 'preview-img';
-                        previewImg.style.maxWidth = '100%';
-                        previewImg.style.maxHeight = '200px';
-                        previewImg.style.marginTop = '15px';
-                        previewImg.style.borderRadius = '8px';
-                        previewImg.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
-                        fileNameDisplay.parentNode.insertBefore(previewImg, fileNameDisplay.nextSibling);
+                const previewImg = document.getElementById('preview-img');
+                if (previewImg) previewImg.remove();
+                
+                // Show preview of first image if there is one
+                if (this.files.length === 1) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        let newPreview = document.createElement('img');
+                        newPreview.id = 'preview-img';
+                        newPreview.style.maxWidth = '100%';
+                        newPreview.style.maxHeight = '200px';
+                        newPreview.style.marginTop = '15px';
+                        newPreview.style.borderRadius = '8px';
+                        newPreview.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+                        newPreview.src = e.target.result;
+                        fileNameDisplay.parentNode.insertBefore(newPreview, fileNameDisplay.nextSibling);
+                        
+                        const icon = document.querySelector('.upload-icon');
+                        if(icon) icon.style.display = 'none';
                     }
-                    previewImg.src = e.target.result;
-                    
+                    reader.readAsDataURL(this.files[0]);
+                } else {
                     const icon = document.querySelector('.upload-icon');
-                    if(icon) icon.style.display = 'none';
+                    if(icon) icon.style.display = 'block';
                 }
-                reader.readAsDataURL(this.files[0]);
             } else {
                 fileNameDisplay.textContent = '';
                 submitBtn.disabled = true;
@@ -253,5 +263,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tooltip.dataset.top) tooltip.style.top = tooltip.dataset.top + '%';
         if (tooltip.dataset.width) tooltip.style.width = tooltip.dataset.width + '%';
         if (tooltip.dataset.height) tooltip.style.height = tooltip.dataset.height + '%';
+    });
+
+    // Handle Tabs interactions
+    const tabMenus = document.querySelectorAll('.tabs-header');
+    tabMenus.forEach(menu => {
+        const btns = menu.querySelectorAll('.tab-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active from all btns in this menu
+                btns.forEach(b => b.classList.remove('active'));
+                
+                // Find all tab contents related to this report
+                const parentSection = menu.closest('.results-section');
+                const contents = parentSection.querySelectorAll('.tab-content');
+                contents.forEach(c => c.classList.remove('active'));
+                
+                // Add active to the clicked btn & target content
+                btn.classList.add('active');
+                const targetId = btn.getAttribute('data-target');
+                const targetContent = document.getElementById(targetId);
+                if(targetContent) targetContent.classList.add('active');
+            });
+        });
     });
 });

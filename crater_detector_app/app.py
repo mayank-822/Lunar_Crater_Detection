@@ -1,240 +1,225 @@
-# from flask import Flask, render_template, request
-# from ultralytics import YOLO
-# import os
-# import uuid
-# import cv2
-
-# import time
-
-# app = Flask(__name__)
-
-# UPLOAD_FOLDER = "static/uploads"
-# RESULT_FOLDER = "static/results"
-
-# os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-# os.makedirs(RESULT_FOLDER, exist_ok=True)
-
-# model = YOLO("model/best.pt")
-
-# @app.route("/", methods=["GET", "POST"])
-# def index():
-#     if request.method == "POST":
-#         file = request.files.get("image")
-#         if file:
-#             filename = str(uuid.uuid4()) + ".jpg"
-#             upload_path = os.path.join(UPLOAD_FOLDER, filename)
-#             file.save(upload_path)
-
-#             start_time = time.time()
-#             results = model(upload_path)
-#             end_time = time.time()
-#             processing_time = round(end_time - start_time, 2)
-
-#             img = cv2.imread(upload_path)
-#             height, width, _ = img.shape
-#             image_area = height * width
-
-#             img_plot = img.copy()
-#             boxes = results[0].boxes
-#             crater_data = []
-
-#             stats = {
-#                 "total": len(boxes),
-#                 "avg_diameter": 0,
-#                 "largest": 0,
-#                 "smallest": float('inf'),
-#                 "avg_conf": 0,
-#                 "density": 0,
-#                 "time": processing_time,
-#                 "small": 0,
-#                 "medium": 0,
-#                 "large": 0
-#             }
-
-#             total_diameter = 0
-#             total_conf = 0
-
-#             for i, box in enumerate(boxes):
-#                 x_c, y_c, w, h = box.xywh[0].tolist()
-#                 conf = float(box.conf[0])
-                
-#                 diameter_px = round(max(w, h), 2)
-                
-#                 if diameter_px < 20:
-#                     size_class = "Small"
-#                     stats["small"] += 1
-#                 elif diameter_px < 50:
-#                     size_class = "Medium"
-#                     stats["medium"] += 1
-#                 else:
-#                     size_class = "Large"
-#                     stats["large"] += 1
-
-#                 total_diameter += diameter_px
-#                 total_conf += conf
-
-#                 if diameter_px > stats["largest"]: stats["largest"] = diameter_px
-#                 if diameter_px < stats["smallest"]: stats["smallest"] = diameter_px
-                
-#                 x1, y1, x2, y2 = box.xyxy[0].tolist()
-
-#                 crater_data.append({
-#                     "id": i + 1,
-#                     "diameter": diameter_px,
-#                     "confidence": round(conf, 2),
-#                     "size": size_class,
-#                     "x": x_c, "y": y_c, "w": w, "h": h,
-#                     "x1": x1, "y1": y1, "x2": x2, "y2": y2
-#                 })
-
-#                 cv2.rectangle(img_plot, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-#                 cv2.circle(img_plot, (int(x_c), int(y_c)), 2, (0, 0, 255), -1)
-#                 cv2.putText(img_plot, f"#{i+1}", (int(x1), int(y1)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-#             if stats["total"] > 0:
-#                 stats["avg_diameter"] = round(total_diameter / stats["total"], 2)
-#                 stats["avg_conf"] = round(total_conf / stats["total"], 2)
-#                 stats["density"] = round((stats["total"] / image_area) * 1000000, 2)
-#             else:
-#                 stats["smallest"] = 0
-
-#             result_path = os.path.join(RESULT_FOLDER, filename)
-#             cv2.imwrite(result_path, img_plot)
-
-#             return render_template(
-#                 "index.html",
-#                 uploaded=True,
-#                 crater_count=stats["total"],
-#                 original_image=upload_path,
-#                 result_image=result_path,
-#                 stats=stats,
-#                 crater_data=crater_data,
-#                 img_width=width,
-#                 img_height=height,
-#                 filename=filename
-#             )
-
-#     return render_template("index.html", uploaded=False)
-
-# if __name__ == "__main__":
-#     app.run(debug=True)
-
-
-from flask import Flask, render_template, request
-from ultralytics import YOLO
 import os
 import uuid
 import cv2
-
 import time
+import csv
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from flask import Flask, render_template, request, send_file
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = "static/uploads"
 RESULT_FOLDER = "static/results"
+DATASET_FOLDER = "static/dataset"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
+os.makedirs(DATASET_FOLDER, exist_ok=True)
 
+from ultralytics import YOLO
 model = YOLO("model/best.pt")
+
+def calculate_iou(box1, box2):
+    x_left = max(box1[0], box2[0])
+    y_top = max(box1[1], box2[1])
+    x_right = min(box1[2], box2[2])
+    y_bottom = min(box1[3], box2[3])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+    box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+
+    return intersection_area / float(box1_area + box2_area - intersection_area)
+
+def process_image(upload_path, filename):
+    start_time = time.time()
+    results = model(upload_path)
+    processing_time = round(time.time() - start_time, 2)
+    
+    img = cv2.imread(upload_path)
+    height, width, _ = img.shape
+    image_area = height * width
+    
+    img_plot = img.copy()
+    
+    boxes = results[0].boxes
+    crater_data = []
+
+    # Terrain Classification (Highlands vs Maria)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    mean_brightness = np.mean(gray)
+    terrain_type = "Highlands (Bright/Rugged)" if mean_brightness > 100 else "Maria (Dark/Smooth)"
+
+    stats = {
+        "total": len(boxes),
+        "avg_diameter": 0, "largest": 0, "smallest": float('inf'),
+        "avg_conf": 0, "density": 0, "time": processing_time,
+        "small": 0, "medium": 0, "large": 0,
+        "terrain": terrain_type,
+        "nw": 0, "ne": 0, "sw": 0, "se": 0
+    }
+
+    # Extract all xyxy for IoU
+    coords = []
+    if len(boxes) > 0:
+        coords = boxes.xyxy.tolist()
+
+    overlapping_set = set()
+    for i, box1 in enumerate(coords):
+        for j, box2 in enumerate(coords):
+            if i != j and calculate_iou(box1, box2) > 0.1: # 0.1 IoU threshold for overlap
+                overlapping_set.add(i)
+                overlapping_set.add(j)
+
+    total_diameter = 0
+    total_conf = 0
+
+    csv_data = [["ID", "X_Center", "Y_Center", "Diameter", "Depth_Est", "Morphology", "Confidence", "Quadrant"]]
+
+    for i, box in enumerate(boxes):
+        x_c, y_c, w, h = box.xywh[0].tolist()
+        conf = float(box.conf[0])
+        diameter_px = round(max(w, h), 2)
+        depth_px = round(diameter_px * 0.2, 2) # Estimate depth
+        
+        # Quadrant
+        quadrant = "NW" if x_c < width/2 and y_c < height/2 else \
+                   "NE" if x_c >= width/2 and y_c < height/2 else \
+                   "SW" if x_c < width/2 and y_c >= height/2 else "SE"
+        stats[quadrant.lower()] += 1
+        
+        # Size class
+        if diameter_px < 20:
+            size_class = "Small"
+            stats["small"] += 1
+        elif diameter_px < 50:
+            size_class = "Medium"
+            stats["medium"] += 1
+        else:
+            size_class = "Large"
+            stats["large"] += 1
+            
+        # Morphology
+        morphology = "Simple"
+        if diameter_px >= 20: morphology = "Complex"
+        aspect_ratio = w / float(h)
+        if aspect_ratio > 1.3 or aspect_ratio < 0.7: morphology = "Degraded"
+        if i in overlapping_set: morphology += "/Overlapping"
+            
+        total_diameter += diameter_px
+        total_conf += conf
+        if diameter_px > stats["largest"]: stats["largest"] = diameter_px
+        if diameter_px < stats["smallest"]: stats["smallest"] = diameter_px
+        
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        
+        crater_data.append({
+            "id": i + 1, "diameter": diameter_px, "depth": depth_px,
+            "confidence": round(conf, 2), "size": size_class, "morphology": morphology,
+            "quadrant": quadrant,
+            "x": x_c, "y": y_c, "w": w, "h": h, "x1": x1, "y1": y1, "x2": x2, "y2": y2
+        })
+        
+        csv_data.append([i+1, round(x_c, 2), round(y_c, 2), diameter_px, depth_px, morphology, round(conf, 2), quadrant])
+        
+        cv2.rectangle(img_plot, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+        cv2.circle(img_plot, (int(x_c), int(y_c)), 2, (0, 0, 255), -1)
+        cv2.putText(img_plot, f"#{i+1}", (int(x1), int(y1)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    if stats["total"] > 0:
+        stats["avg_diameter"] = round(total_diameter / stats["total"], 2)
+        stats["avg_conf"] = round(total_conf / stats["total"], 2)
+        stats["density"] = round((stats["total"] / image_area) * 1000000, 2)
+    else:
+        stats["smallest"] = 0
+
+    # Age Estimation (toy logic based on density)
+    if stats["density"] > 500: age = "Imbrian (~3.8 Billion Yrs)"
+    elif stats["density"] > 100: age = "Eratosthenian (~3.2 Billion Yrs)"
+    else: age = "Copernican (< 1 Billion Yrs)"
+    stats["age"] = age
+
+    # Export CSV
+    csv_path = os.path.join(DATASET_FOLDER, f"{filename.split('.')[0]}.csv")
+    with open(csv_path, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(csv_data)
+
+    result_path = os.path.join(RESULT_FOLDER, filename)
+    cv2.imwrite(result_path, img_plot)
+
+    # Visualization & Scientific Mapping
+    heatmap_path = os.path.join(RESULT_FOLDER, f"heatmap_{filename}")
+    riskmap_path = os.path.join(RESULT_FOLDER, f"riskmap_{filename}")
+    chart_path = os.path.join(RESULT_FOLDER, f"chart_{filename}")
+    
+    # Heatmap
+    heatmap = np.zeros((height, width), dtype=np.float32)
+    for c in crater_data:
+        cv2.circle(heatmap, (int(c["x"]), int(c["y"])), int(c["diameter"]), 1, -1)
+    heatmap = cv2.GaussianBlur(heatmap, (51, 51), 0)
+    heatmap_norm = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    heatmap_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_JET)
+    cv2.imwrite(heatmap_path, cv2.addWeighted(img, 0.5, heatmap_color, 0.5, 0))
+    
+    # Risk Map (Similar but thresholded/inverted color scheme)
+    risk_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_AUTUMN)
+    cv2.imwrite(riskmap_path, cv2.addWeighted(img, 0.4, risk_color, 0.6, 0))
+    
+    # Chart
+    plt.figure(figsize=(6, 4))
+    sizes = [stats["small"], stats["medium"], stats["large"]]
+    labels = ["Small", "Medium", "Large"]
+    plt.bar(labels, sizes, color=['#4e6ef2', '#8a9fed', '#2b48bd'])
+    plt.title("Crater Size Distribution")
+    plt.ylabel("Count")
+    plt.tight_layout()
+    plt.savefig(chart_path)
+    plt.close()
+
+    return {
+        "filename": filename,
+        "original_image": upload_path,
+        "result_image": result_path,
+        "heatmap": heatmap_path,
+        "riskmap": riskmap_path,
+        "chart": chart_path,
+        "csv": csv_path,
+        "stats": stats,
+        "crater_data": crater_data,
+        "width": width,
+        "height": height
+    }
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
-        file = request.files.get("image")
-        if file:
-            filename = str(uuid.uuid4()) + ".jpg"
-            upload_path = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(upload_path)
-
-            start_time = time.time()
-            results = model(upload_path)
-            end_time = time.time()
-            processing_time = round(end_time - start_time, 2)
-
-            img = cv2.imread(upload_path)
-            height, width, _ = img.shape
-            image_area = height * width
-
-            img_plot = img.copy()
-            boxes = results[0].boxes
-            crater_data = []
-
-            stats = {
-                "total": len(boxes),
-                "avg_diameter": 0,
-                "largest": 0,
-                "smallest": float('inf'),
-                "avg_conf": 0,
-                "density": 0,
-                "time": processing_time,
-                "small": 0,
-                "medium": 0,
-                "large": 0
-            }
-
-            total_diameter = 0
-            total_conf = 0
-
-            for i, box in enumerate(boxes):
-                x_c, y_c, w, h = box.xywh[0].tolist()
-                conf = float(box.conf[0])
+        files = request.files.getlist("image")
+        reports = []
+        global_summary = { "images": 0, "total_craters": 0, "avg_density": 0 }
+        
+        for file in files:
+            if file and file.filename != '':
+                filename = str(uuid.uuid4()) + ".jpg"
+                upload_path = os.path.join(UPLOAD_FOLDER, filename)
+                file.save(upload_path)
+                rep = process_image(upload_path, filename)
+                reports.append(rep)
                 
-                diameter_px = round(max(w, h), 2)
+                global_summary["images"] += 1
+                global_summary["total_craters"] += rep["stats"]["total"]
+                global_summary["avg_density"] += rep["stats"]["density"]
                 
-                if diameter_px < 20:
-                    size_class = "Small"
-                    stats["small"] += 1
-                elif diameter_px < 50:
-                    size_class = "Medium"
-                    stats["medium"] += 1
-                else:
-                    size_class = "Large"
-                    stats["large"] += 1
-
-                total_diameter += diameter_px
-                total_conf += conf
-
-                if diameter_px > stats["largest"]: stats["largest"] = diameter_px
-                if diameter_px < stats["smallest"]: stats["smallest"] = diameter_px
-                
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-
-                crater_data.append({
-                    "id": i + 1,
-                    "diameter": diameter_px,
-                    "confidence": round(conf, 2),
-                    "size": size_class,
-                    "x": x_c, "y": y_c, "w": w, "h": h,
-                    "x1": x1, "y1": y1, "x2": x2, "y2": y2
-                })
-
-                cv2.rectangle(img_plot, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                cv2.circle(img_plot, (int(x_c), int(y_c)), 2, (0, 0, 255), -1)
-                cv2.putText(img_plot, f"#{i+1}", (int(x1), int(y1)-5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            if stats["total"] > 0:
-                stats["avg_diameter"] = round(total_diameter / stats["total"], 2)
-                stats["avg_conf"] = round(total_conf / stats["total"], 2)
-                stats["density"] = round((stats["total"] / image_area) * 1000000, 2)
-            else:
-                stats["smallest"] = 0
-
-            result_path = os.path.join(RESULT_FOLDER, filename)
-            cv2.imwrite(result_path, img_plot)
-
-            return render_template(
-                "index.html",
-                uploaded=True,
-                crater_count=stats["total"],
-                original_image=upload_path,
-                result_image=result_path,
-                stats=stats,
-                crater_data=crater_data,
-                img_width=width,
-                img_height=height,
-                filename=filename
-            )
+        if global_summary["images"] > 0:
+            global_summary["avg_density"] = round(global_summary["avg_density"] / global_summary["images"], 2)
+            
+        return render_template("index.html", uploaded=True, reports=reports, summary=global_summary)
 
     return render_template("index.html", uploaded=False)
 
