@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Lunar Crater Detector</title>
+    <title>Mission Control - Lunar Recon</title>
     <!-- FontAwesome for futuristic icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom Style System -->
@@ -11,195 +11,395 @@
 </head>
 <body>
 
-    <div class="main-wrapper">
-        <div class="container">
+    <nav class="app-nav">
+        <div class="nav-links">
+            <button class="nav-link active" onclick="switchPage('dashboard', event)">Mission Dashboard</button>
+            <button class="nav-link" onclick="switchPage('analysis', event)">Topographic Analysis</button>
+            <button class="nav-link" onclick="switchPage('controls', event)">Mission Controls</button>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <!-- PAGE 1: DASHBOARD -->
+        <div id="page-dashboard" class="page active">
             
-            <h1>🌕 Lunar Crater Detector</h1>
-            
-            <form id="upload-form" method="POST" enctype="multipart/form-data">
-                <div class="upload-area" id="upload-area">
-                    <div class="scanner"></div>
-                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
-                    <input type="file" id="image-upload" name="image" accept="image/*" multiple required>
-                    <label for="image-upload" class="file-label">
-                        <strong>Choose a lunar image</strong> or drag and drop it here
-                    </label>
-                    <div id="file-name" class="file-name"></div>
-                </div>
-
-                <button type="submit" id="submit-btn" class="submit-btn" disabled>
-                    <i class="fa-solid fa-satellite"></i> Scan for Craters
-                </button>
-
-                <div id="loading-indicator" class="loading-indicator">
-                    <div class="spinner"></div>
-                    <p id="loading-text" class="typing-cursor"></p>
-                </div>
-            </form>
-
-            {% if uploaded %}
-            <div class="global-summary" style="margin-bottom: 30px; padding: 20px; background: rgba(78, 110, 242, 0.2); border-radius: 12px; border: 1px solid var(--primary-color);">
-                <h2 style="margin-top: 0; color: #fff;">Summary Report</h2>
-                <div style="display: flex; justify-content: space-around; font-size: 1.2rem;">
-                    <div>Analyzed Regions: <strong>{{ summary.images }}</strong></div>
-                    <div>Total Craters Detected: <strong>{{ summary.total_craters }}</strong></div>
-                    <div>Avg Density: <strong>{{ summary.avg_density }} / km²</strong></div>
-                </div>
-                <a href="/" class="submit-btn" style="margin-top: 20px; text-decoration: none; display: inline-flex;"><i class="fa-solid fa-sync"></i> Analyze More Sectors</a>
-            </div>
-
-            {% if combined_region %}
-            <div class="results-section combined-region-section" style="margin-bottom: 50px; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 40px; background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; border: 2px solid #10b981;">
-                <h2 style="color: #fff; text-align: left; border-left: 4px solid #10b981; padding-left: 10px;">🌟 Unified Lunar Region Map</h2>
-                <div class="crater-count" style="background: rgba(16,185,129,0.2); border-color: #10b981;">
-                    Total Combined Craters: <span class="count-badge" style="background: #10b981;">{{ combined_region.total_craters }}</span>
-                </div>
-                
-                <div class="result-images-wrapper">
-                    <div class="image-box" style="flex: 1;">
-                        <h3>Combined Detection Map</h3>
-                        <img src="{{ '/' + combined_region.map_image }}" class="result-image" alt="Combined Map">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-header-left">
+                        <i class="fa-solid fa-rocket" style="color: var(--primary-color);"></i> Mission Control
                     </div>
-                    <div class="image-box" style="flex: 1;">
-                        <h3>Combined Density Heatmap</h3>
-                        <img src="{{ '/' + combined_region.heatmap_image }}" class="result-image" alt="Combined Heatmap">
-                    </div>
-                </div>
-
-                <div class="actions-panel" style="margin: 30px 0;">
-                    <a href="{{ '/' + combined_region.csv }}" download="regional_combined_dataset.csv" class="submit-btn" style="text-decoration: none; display: inline-flex; background: linear-gradient(135deg, #10b981, #059669); margin-right: 15px;">
-                        <i class="fa-solid fa-file-csv"></i> Download Regional Dataset (CSV)
-                    </a>
-                    <a href="{{ '/' + combined_region.map_image }}" download="regional_map.jpg" class="submit-btn" style="text-decoration: none; display: inline-flex;">
-                        <i class="fa-solid fa-map"></i> Download Regional Map
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-
-            {% for report in reports %}
-            <div class="results-section" style="margin-bottom: 50px; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 40px;">
-                <h2 style="color: #fff; text-align: left; border-left: 4px solid var(--primary-color); padding-left: 10px;">Region: {{ report.filename }}</h2>
-                <div class="tabs-header">
-                    <button class="tab-btn active" data-target="tab-detection-{{ loop.index }}">Detection</button>
-                    <button class="tab-btn" data-target="tab-visualizations-{{ loop.index }}">Visualizations</button>
-                    <button class="tab-btn" data-target="tab-analysis-{{ loop.index }}">Analysis</button>
-                    <button class="tab-btn" data-target="tab-data-{{ loop.index }}">Raw Data</button>
-                </div>
-
-                <div class="tab-content active" id="tab-detection-{{ loop.index }}">
-                    <div class="crater-count">
-                        Detected Craters: <span class="count-badge">{{ report.stats.total }}</span>
-                    </div>
-                    
-                    <div class="result-images-wrapper">
-                        <div class="image-box">
-                            <h3>Original Scan</h3>
-                            <img src="{{ '/' + report.original_image }}" class="result-image" alt="Original Lunar Surface">
+                    <div class="panel-header-right">
+                        SYSTEM STATUS <br> <span style="color: var(--status-color);">OPERATIONAL</span>
+                        <div class="status-bars">
+                            <div class="s-bar"></div>
+                            <div class="s-bar"></div>
+                            <div class="s-bar"></div>
                         </div>
-                        <div class="image-box">
-                            <h3>AI Detected Craters</h3>
-                            <div class="result-image-container" style="position: relative; display: inline-block;">
-                                <div class="scanner-horizontal"></div>
-                                <img src="{{ '/' + report.result_image }}" class="result-image" alt="AI Detection Results">
-                                {% for crater in report.crater_data %}
-                                <div class="crater-tooltip-target" 
-                                    data-left="{{ (crater.x1 / report.width) * 100 }}"
-                                    data-top="{{ (crater.y1 / report.height) * 100 }}"
-                                    data-width="{{ ((crater.x2 - crater.x1) / report.width) * 100 }}"
-                                    data-height="{{ ((crater.y2 - crater.y1) / report.height) * 100 }}"
-                                    title="Crater #{{ crater.id }}&#10;Size: {{ crater.size }}&#10;Diameter: {{ crater.diameter }}px&#10;Depth: ~{{ crater.depth }}px&#10;Morphology: {{ crater.morphology }}&#10;Confidence: {{ crater.confidence }}">
+                    </div>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Dashboard Left Column -->
+                    <div class="dash-col">
+                        <div class="hud-card upload-card mb-20">
+                            <div class="hud-card-title">IMAGING SENSOR UPLOAD</div>
+                            
+                            <form id="upload-form" method="POST" enctype="multipart/form-data">
+                                <div class="upload-area" id="upload-area">
+                                    <i class="fa-solid fa-satellite-dish mb-10" style="font-size: 2rem; color: #555;"></i>
+                                    <input type="file" id="image-upload" name="image" accept="image/*" multiple required>
+                                    <label for="image-upload" class="file-label">
+                                        <strong style="color: #fff;">SELECT REGION SCANS</strong> <br> (Drag & Drop)
+                                    </label>
+                                    <div id="file-name" class="file-name"></div>
                                 </div>
-                                {% endfor %}
+
+                                <button type="submit" id="submit-btn" class="action-btn" disabled>
+                                    INITIATE SCAN
+                                </button>
+                                
+                                <div id="loading-indicator" class="loading-indicator">
+                                    <div class="spinner"></div>
+                                    <p id="loading-text" class="typing-cursor" style="font-size:0.7rem;">TRANSMITTING...</p>
+                                </div>
+                            </form>
+                        </div>
+
+                        {% if uploaded %}
+                        <div class="hud-card">
+                            <div class="hud-card-title">GLOBAL SUMMARY</div>
+                            
+                            <div class="metric">
+                                <div class="metric-label">ANALYZED REGIONS</div>
+                                <div class="metric-value">{{ summary.images }}</div>
+                                <div class="hud-bar mt-5"></div>
+                            </div>
+                            
+                            <div class="metric mt-20">
+                                <div class="metric-label">TOTAL CRATERS DETECTED</div>
+                                <div class="metric-value" style="color: var(--status-color);">{{ summary.total_craters }}</div>
+                                <div class="hud-bar mt-5" style="background: var(--status-color);"></div>
+                            </div>
+                            
+                            <div class="metric mt-20">
+                                <div class="metric-label">AVERAGE DENSITY</div>
+                                <div class="metric-value" style="color: var(--alert-color);">{{ summary.avg_density }} <span class="metric-unit">/ KM²</span></div>
+                                <div class="hud-bar mt-5" style="background: var(--alert-color);"></div>
+                            </div>
+                            
+                            <div class="metric mt-20">
+                                <div class="metric-label">PROCESSING TIME</div>
+                                <div class="metric-value" style="font-size:1.5rem;">{{ reports[0].stats.time if reports else "0.00" }} <span class="metric-unit">SEC</span></div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
 
-                    <div class="actions-panel" style="margin: 30px 0;">
-                        <a href="{{ '/' + report.result_image }}" download="lunar_detection_{{ report.filename }}" class="submit-btn" style="text-decoration: none; display: inline-flex; margin-right: 15px;">
-                            <i class="fa-solid fa-image"></i> Download Image
-                        </a>
-                        <a href="{{ '/' + report.csv }}" download="crater_data_{{ report.filename }}.csv" class="submit-btn" style="text-decoration: none; display: inline-flex; background: linear-gradient(135deg, #10b981, #059669);">
-                            <i class="fa-solid fa-file-csv"></i> Export Dataset (CSV)
-                        </a>
+                    <!-- Dashboard Center Column -->
+                    <div class="dash-col dash-center">
+                        {% if combined_region %}
+                        <div class="feed-header">SECTOR // REGIONAL UNIFIED MAP</div>
+                        <div class="feed-image-container">
+                            <img src="{{ '/' + combined_region.map_image }}" class="feed-img" alt="Map">
+                            <div class="crosshair-center"></div>
+                        </div>
+                        <div class="feed-footer">
+                            <div class="ff-item">
+                                <div class="ff-label">COMBINED CRATERS</div>
+                                <div class="ff-value">{{ combined_region.total_craters }}</div>
+                            </div>
+                            <div class="ff-item" style="text-align: right;">
+                                <div class="ff-label">LAT / LONG BALANCE</div>
+                                <div class="ff-value" style="color: var(--status-color);">OPTIMAL</div>
+                            </div>
+                        </div>
+                        {% elif uploaded and reports %}
+                        <div class="feed-header">SECTOR // MARIA CRISIUM ({{ reports[0].filename }})</div>
+                        <div class="feed-image-container">
+                            <img src="{{ '/' + reports[0].result_image }}" class="feed-img" alt="Map">
+                            <div class="crosshair-center"></div>
+                        </div>
+                        <div class="feed-footer">
+                            <div class="ff-item">
+                                <div class="ff-label">DETECTED CRATERS</div>
+                                <div class="ff-value">{{ reports[0].stats.total }}</div>
+                            </div>
+                            <div class="ff-item" style="text-align: right;">
+                                <div class="ff-label">AI CONFIDENCE</div>
+                                <div class="ff-value" style="color: var(--status-color);">{{ reports[0].stats.avg_conf }}</div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="feed-header">SECTOR // AWAITING UPLOAD</div>
+                        <div class="feed-image-container no-signal">
+                            <div style="text-align:center;">
+                                <i class="fa-solid fa-satellite-dish" style="font-size:3rem; color: #333; margin-bottom:10px;"></i>
+                                <div>NO SIGNAL DETECTED</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Dashboard Right Column -->
+                    <div class="dash-col">
+                        <div class="hud-card">
+                            <div class="hud-card-title">DISCOVERY LOG</div>
+                            <div class="discovery-log">
+                                {% if uploaded %}
+                                    <div class="log-entry">
+                                        <div class="log-text">Automatic crater detection identifies sequence in Sectors. Scan complete.</div>
+                                        <div class="log-badge status">OPERATIONAL</div>
+                                    </div>
+                                    {% if summary.avg_density > 50 %}
+                                    <div class="log-entry">
+                                        <div class="log-text">Warning: High crater density detected. Terrain hazard potential elevated.</div>
+                                        <div class="log-badge alert">TERRAIN WARNING</div>
+                                    </div>
+                                    {% endif %}
+                                    <div class="log-entry" style="border-bottom: none;">
+                                        <div class="log-text">Telemetry data ready for topographic extraction.</div>
+                                        <a href="{{ '/' + combined_region.csv if combined_region else '/' + reports[0].csv }}" class="action-btn" style="background:var(--primary-color); display:block; text-align:center; padding-top:8px;">EXPORT DATASET</a>
+                                    </div>
+                                {% else %}
+                                    <div class="log-entry" style="border:none; color:#555;">
+                                        Waiting for scan initiation...
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="hud-card mt-20">
+                            <div class="hud-card-title">EXTERNAL SENSORS</div>
+                            <div style="display:flex; justify-content: space-between;">
+                                <div>
+                                    <div style="font-size:1.5rem; font-family:var(--font-numbers); font-weight:700;">-173°C</div>
+                                    <div style="font-size:0.6rem; color:var(--text-muted);">SURFACE TEMP</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size:1.5rem; font-family:var(--font-numbers); font-weight:700; color:var(--status-color);">0.0%</div>
+                                    <div style="font-size:0.6rem; color:var(--text-muted);">HAZARD</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if combined_region %}
+                        <div class="hud-card mt-20">
+                            <div class="hud-card-title">REGIONAL HEATMAP</div>
+                            <img src="{{ '/' + combined_region.heatmap_image }}" style="width:100%; border:1px solid #333; filter: grayscale(50%) contrast(150%);">
+                        </div>
+                        {% elif uploaded %}
+                        <div class="hud-card mt-20">
+                            <div class="hud-card-title">SECTOR HEATMAP</div>
+                            <img src="{{ '/' + reports[0].heatmap }}" style="width:100%; border:1px solid #333; filter: grayscale(50%) contrast(150%);">
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
-
-                <div class="tab-content" id="tab-visualizations-{{ loop.index }}">
-                    <div class="result-images-wrapper" style="margin-top: 20px;">
-                        <div class="image-box">
-                            <h3>Crater Density Heatmap</h3>
-                            <img src="{{ '/' + report.heatmap }}" class="result-image" alt="Density Heatmap">
-                        </div>
-                        <div class="image-box">
-                            <h3>Landing Risk Map</h3>
-                            <img src="{{ '/' + report.riskmap }}" class="result-image" alt="Risk Map">
-                        </div>
-                        <div class="image-box" style="background: white;">
-                            <h3 style="color: #333;">Size Distribution</h3>
-                            <img src="{{ '/' + report.chart }}" class="result-image" alt="Chart">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-analysis-{{ loop.index }}">
-                    <div class="info-cards">
-                        <div class="info-card"><i class="fa-solid fa-mountain"></i> <span>Terrain: {{ report.stats.terrain }}</span></div>
-                        <div class="info-card"><i class="fa-solid fa-hourglass-half"></i> <span>Est. Age: {{ report.stats.age }}</span></div>
-                        <div class="info-card"><i class="fa-solid fa-bullseye"></i> <span>Avg Confidence: {{ report.stats.avg_conf }}</span></div>
-                    </div>
-                    
-                    <div class="stats-panel">
-                        <h2>Crater Analysis Details</h2>
-                        <ul>
-                            <li>Total Craters: {{ report.stats.total }}</li>
-                            <li>Average Diameter: {{ report.stats.avg_diameter }} px</li>
-                            <li>Largest Crater: {{ report.stats.largest }} px</li>
-                            <li>Smallest Crater: {{ report.stats.smallest }} px</li>
-                            <li>Crater Density: {{ report.stats.density }} / km²</li>
-                            <li>Processing Time: {{ report.stats.time }} sec</li>
-                        </ul>
-                    </div>
-
-                    <div class="size-distribution">
-                        <h3>Regional Analysis (Quadrants)</h3>
-                        <ul>
-                            <li>NW: {{ report.stats.nw }}</li>
-                            <li>NE: {{ report.stats.ne }}</li>
-                            <li>SW: {{ report.stats.sw }}</li>
-                            <li>SE: {{ report.stats.se }}</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="tab-content" id="tab-data-{{ loop.index }}">
-                    <table class="crater-table">
-                        <tr>
-                            <th>ID</th>
-                            <th>Diameter</th>
-                            <th>Est. Depth</th>
-                            <th>Morphology</th>
-                            <th>Confidence</th>
-                        </tr>
-                        {% for crater in report.crater_data %}
-                        <tr>
-                            <td>{{ crater.id }}</td>
-                            <td>{{ crater.diameter }} px</td>
-                            <td>{{ crater.depth }} px</td>
-                            <td>{{ crater.morphology }}</td>
-                            <td>{{ crater.confidence }}</td>
-                        </tr>
-                        {% endfor %}
-                    </table>
+                
+                <div class="bottom-footer">
+                    <div><i class="fa-solid fa-border-all"></i> DASHBOARD</div>
+                    <div><i class="fa-solid fa-video"></i> LIVE FEED</div>
+                    <div><i class="fa-solid fa-chart-line"></i> ANALYTICS</div>
+                    <div><i class="fa-solid fa-sliders"></i> CONTROLS</div>
                 </div>
             </div>
-            {% endfor %}
-            {% endif %}
+        </div>
 
+
+        <!-- PAGE 2: ANALYSIS -->
+        <div id="page-analysis" class="page">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-header-left">
+                        <i class="fa-solid fa-rocket" style="color: var(--primary-color);"></i> Mission Control
+                    </div>
+                    <div class="panel-header-right">
+                        SYSTEM STATUS <br> <span style="color: var(--status-color);">OPERATIONAL</span>
+                    </div>
+                </div>
+                
+                <div class="panel-body" style="grid-template-columns: 1fr 1fr; gap: 40px;">
+                    <!-- LEFT -->
+                    <div>
+                        <div class="hud-card-title">TOPOGRAPHIC_ANALYSIS</div>
+                        <div class="feed-header mb-20" style="font-size: 1.2rem; font-family: var(--font-numbers);">SECTOR RISK BREAKDOWN</div>
+                        
+                        {% if not uploaded %}
+                            <div style="color: #666; margin-top:20px;">Awaiting telemetry data sequence...</div>
+                        {% else %}
+                            <div class="feed-image-container" style="border:1px solid #444;">
+                                <!-- Using Risk map or Heatmap -->
+                                <img src="{{ '/' + reports[0].riskmap }}" style="width:100%; mix-blend-mode: screen; filter: grayscale(20%);">
+                            </div>
+
+                            <div class="flex-row mt-20">
+                                <div class="metric">
+                                    <div class="metric-label">AZIMUTH / ELEVATION</div>
+                                    <div class="metric-value" style="font-size: 1.5rem; color: var(--primary-color);">142.8° <span class="metric-unit">12.4°</span></div>
+                                </div>
+                                <div class="metric" style="text-align: right;">
+                                    <div class="metric-label">SECTOR ID</div>
+                                    <div class="metric-value" style="font-size: 1.5rem;">TYCHO-B</div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- RIGHT -->
+                    <div>
+                        {% if uploaded %}
+                        <div class="hud-card mb-20">
+                            <div class="hud-card-title">SIZE DISTRIBUTION (px)</div>
+                            <img src="{{ '/' + reports[0].chart }}" style="width:100%; filter: invert(0.9) hue-rotate(180deg) contrast(120%); mix-blend-mode: screen;">
+                        </div>
+
+                        <div class="hud-card">
+                            <div class="hud-card-title">TERRAIN COMPOSITION ESTIMATE</div>
+                            
+                            <div class="mb-10">
+                                <div class="flex-row" style="margin-bottom: 5px;">
+                                    <div style="font-size: 0.7rem;">ILMENITE (TiFeO3)</div>
+                                    <div style="font-size: 0.7rem; color:var(--primary-color);">42.8%</div>
+                                </div>
+                                <div class="hud-bar" style="width: 42.8%;"></div>
+                            </div>
+                            
+                            <div class="mb-10">
+                                <div class="flex-row" style="margin-bottom: 5px;">
+                                    <div style="font-size: 0.7rem;">PYROXENE</div>
+                                    <div style="font-size: 0.7rem; color:var(--status-color);">10.0%</div>
+                                </div>
+                                <div class="hud-bar" style="width: 10%; background:var(--status-color);"></div>
+                            </div>
+
+                            <div class="mb-10">
+                                <div class="flex-row" style="margin-bottom: 5px;">
+                                    <div style="font-size: 0.7rem;">PLAGIOCLASE</div>
+                                    <div style="font-size: 0.7rem; color:var(--text-muted);">15.2%</div>
+                                </div>
+                                <div class="hud-bar" style="width: 15.2%; background:#fff;"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex-row mt-20 gap-20">
+                            <div class="hud-card" style="flex:1;">
+                                <div class="hud-card-title">MAX TEMP</div>
+                                <div class="metric-value">127°C</div>
+                            </div>
+                            <div class="hud-card" style="flex:1;">
+                                <div class="hud-card-title">MIN TEMP</div>
+                                <div class="metric-value" style="color:var(--primary-color);">-173°C</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE 3: CONTROLS -->
+        <div id="page-controls" class="page">
+             <div class="panel">
+                 <div class="panel-header">
+                    <div class="panel-header-left">
+                        <i class="fa-solid fa-rocket" style="color: var(--primary-color);"></i> Mission Control
+                    </div>
+                    <div class="panel-header-right">
+                        LINK STATUS <br> <span style="color: var(--status-color);">ACTIVE // Tx-Rx</span>
+                    </div>
+                </div>
+
+                <div class="panel-body" style="grid-template-columns: 1.5fr 1fr;">
+                    <div>
+                        <div class="hud-card-title">SYSTEM CONFIGURATION // RAW DATA DUMP</div>
+                        <div class="feed-header mb-20" style="font-size: 1.5rem; font-family: var(--font-numbers);">Precision <span style="color:var(--primary-color);">Parameters</span></div>
+                        <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">Review core detection telemetry and isolated crater data arrays. This log operates directly from the ML vision pipeline.</p>
+
+                        {% if not uploaded %}
+                            <div style="color: #666; margin-top:20px;">No arrays available. Upload images to initialize logic loop.</div>
+                        {% else %}
+
+                            <div style="margin-top: 30px; height: 500px; overflow-y: auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>CRATER_ID</th>
+                                            <th>DIAMETER</th>
+                                            <th>DEPTH</th>
+                                            <th>MORPHOLOGY</th>
+                                            <th>AI_CONFIDENCE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for report in reports %}
+                                            {% for crater in report.crater_data %}
+                                            <tr>
+                                                <td style="color:#fff; font-family:var(--font-numbers);">#{{ crater.id }}</td>
+                                                <td>{{ crater.diameter }} px</td>
+                                                <td>{{ crater.depth }} px</td>
+                                                <td style="font-size: 0.7rem;">{{ crater.morphology }}</td>
+                                                <td>
+                                                    <div style="margin-bottom:3px; font-family:var(--font-heading); color: var(--primary-color);">{{ crater.confidence }}</div>
+                                                    <div style="background:#222; height:2px; width:100%;"><div style="background:var(--primary-color); height:2px; width: {{ crater.confidence * 100 }}%;"></div></div>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <div class="hud-card" style="border-color: var(--alert-color);">
+                            <div class="hud-card-title" style="color: var(--alert-color);"><i class="fa-solid fa-triangle-exclamation"></i> CRITICAL SAFETY</div>
+                            <div style="font-family: var(--font-numbers); font-size: 1.2rem; color: #fff; margin-bottom: 10px;">Emergency Abort</div>
+                            <p style="font-size: 0.7rem; color: #aaa; margin-bottom: 20px;">Instantly severs all power to computation arrays and halts further model inferences. Non-reversible.</p>
+                            <button class="action-btn" style="background: var(--alert-color); color: #000;">INITIATE ABORT</button>
+                        </div>
+                        
+                        <div class="flex-row gap-20 mt-20">
+                            <div class="hud-card" style="flex:1;">
+                                <div class="hud-card-title">MANUAL OVERRIDE</div>
+                                <div class="flex-row">
+                                    <div style="font-size: 0.7rem; color: #fff;">REMOTE PILOT</div>
+                                    <div class="toggle-switch"></div>
+                                </div>
+                                <div class="hud-bar mt-10 mb-10" style="background: #333;"></div>
+                                <div class="flex-row">
+                                    <div style="font-size: 0.7rem; color: #fff;">DRIVE LOCK</div>
+                                    <div class="toggle-switch active"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="hud-card" style="flex:1; display:flex; justify-content:center; align-items:center;">
+                                <div class="cross-marker"></div>
+                            </div>
+                        </div>
+
+                        <div class="hud-card mt-20">
+                            <div class="hud-card-title mb-10">DATA TRANSMISSION PROTOCOLS</div>
+                            <div class="flex-row">
+                                <div>
+                                    <div style="font-size: 0.6rem; color: var(--text-muted);">CH_01_NAV</div>
+                                    <div style="font-size: 1.5rem; color: #fff; font-family: var(--font-numbers);">450 <span style="font-size: 0.6rem; color: #555;">KB/S</span></div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.6rem; color: var(--text-muted);">CH_02_VIS</div>
+                                    <div style="font-size: 1.5rem; color: var(--primary-color); font-family: var(--font-numbers);">12.4 <span style="font-size: 0.6rem; color: #555;">MB/S</span></div>
+                                </div>
+                            </div>
+                            <div class="hud-bar mt-10" style="background: #333; height: 1px;"></div>
+                        </div>
+                    </div>
+                </div>
+             </div>
         </div>
     </div>
 
-    <!-- Interactive Space Canvas & Input Logic -->
+    <!-- Switch Page Handling Script Addressed in Separate JS File -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

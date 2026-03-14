@@ -288,3 +288,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// Global function to handle page switching
+window.switchPage = function(pageId, event) {
+    if(event) {
+        event.preventDefault();
+    }
+    
+    // Remove active class from all pages
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    
+    // Remove active class from all nav links
+    document.querySelectorAll('.nav-link').forEach(btn => btn.classList.remove('active'));
+    
+    // Add active class to target page
+    const targetPage = document.getElementById('page-' + pageId);
+    if(targetPage) {
+        targetPage.classList.add('active');
+    }
+    
+    // Add active class to clicked button
+    if(event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+    } else {
+        // Fallback to finding the button by onclick attribute if event isn't passed perfectly
+        const btn = document.querySelector(`.nav-link[onclick*="${pageId}"]`);
+        if(btn) btn.classList.add('active');
+    }
+};
