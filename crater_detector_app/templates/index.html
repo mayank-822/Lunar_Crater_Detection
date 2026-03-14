@@ -48,6 +48,35 @@
                 <a href="/" class="submit-btn" style="margin-top: 20px; text-decoration: none; display: inline-flex;"><i class="fa-solid fa-sync"></i> Analyze More Sectors</a>
             </div>
 
+            {% if combined_region %}
+            <div class="results-section combined-region-section" style="margin-bottom: 50px; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 40px; background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; border: 2px solid #10b981;">
+                <h2 style="color: #fff; text-align: left; border-left: 4px solid #10b981; padding-left: 10px;">🌟 Unified Lunar Region Map</h2>
+                <div class="crater-count" style="background: rgba(16,185,129,0.2); border-color: #10b981;">
+                    Total Combined Craters: <span class="count-badge" style="background: #10b981;">{{ combined_region.total_craters }}</span>
+                </div>
+                
+                <div class="result-images-wrapper">
+                    <div class="image-box" style="flex: 1;">
+                        <h3>Combined Detection Map</h3>
+                        <img src="{{ '/' + combined_region.map_image }}" class="result-image" alt="Combined Map">
+                    </div>
+                    <div class="image-box" style="flex: 1;">
+                        <h3>Combined Density Heatmap</h3>
+                        <img src="{{ '/' + combined_region.heatmap_image }}" class="result-image" alt="Combined Heatmap">
+                    </div>
+                </div>
+
+                <div class="actions-panel" style="margin: 30px 0;">
+                    <a href="{{ '/' + combined_region.csv }}" download="regional_combined_dataset.csv" class="submit-btn" style="text-decoration: none; display: inline-flex; background: linear-gradient(135deg, #10b981, #059669); margin-right: 15px;">
+                        <i class="fa-solid fa-file-csv"></i> Download Regional Dataset (CSV)
+                    </a>
+                    <a href="{{ '/' + combined_region.map_image }}" download="regional_map.jpg" class="submit-btn" style="text-decoration: none; display: inline-flex;">
+                        <i class="fa-solid fa-map"></i> Download Regional Map
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
             {% for report in reports %}
             <div class="results-section" style="margin-bottom: 50px; border-bottom: 2px solid rgba(255,255,255,0.2); padding-bottom: 40px;">
                 <h2 style="color: #fff; text-align: left; border-left: 4px solid var(--primary-color); padding-left: 10px;">Region: {{ report.filename }}</h2>
