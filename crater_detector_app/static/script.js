@@ -118,14 +118,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingIndicator = document.getElementById('loading-indicator');
 
     if (fileInput) {
-        // Update file name display when native dialog is used
+        // Update file name display and show image preview when native dialog is used
         fileInput.addEventListener('change', function() {
             if (this.files && this.files.length > 0) {
                 fileNameDisplay.textContent = 'Selected: ' + this.files[0].name;
                 submitBtn.disabled = false;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    let previewImg = document.getElementById('preview-img');
+                    if (!previewImg) {
+                        previewImg = document.createElement('img');
+                        previewImg.id = 'preview-img';
+                        previewImg.style.maxWidth = '100%';
+                        previewImg.style.maxHeight = '200px';
+                        previewImg.style.marginTop = '15px';
+                        previewImg.style.borderRadius = '8px';
+                        previewImg.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
+                        fileNameDisplay.parentNode.insertBefore(previewImg, fileNameDisplay.nextSibling);
+                    }
+                    previewImg.src = e.target.result;
+                    
+                    const icon = document.querySelector('.upload-icon');
+                    if(icon) icon.style.display = 'none';
+                }
+                reader.readAsDataURL(this.files[0]);
             } else {
                 fileNameDisplay.textContent = '';
                 submitBtn.disabled = true;
+                
+                const previewImg = document.getElementById('preview-img');
+                if (previewImg) previewImg.remove();
+                
+                const icon = document.querySelector('.upload-icon');
+                if(icon) icon.style.display = 'block';
             }
         });
 
@@ -219,4 +245,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Apply crater tooltip dynamic positioning
+    const tooltips = document.querySelectorAll('.crater-tooltip-target');
+    tooltips.forEach(tooltip => {
+        if (tooltip.dataset.left) tooltip.style.left = tooltip.dataset.left + '%';
+        if (tooltip.dataset.top) tooltip.style.top = tooltip.dataset.top + '%';
+        if (tooltip.dataset.width) tooltip.style.width = tooltip.dataset.width + '%';
+        if (tooltip.dataset.height) tooltip.style.height = tooltip.dataset.height + '%';
+    });
 });

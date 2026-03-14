@@ -42,17 +42,109 @@
                 <div class="crater-count">
                     Detected Craters: <span class="count-badge">{{ crater_count }}</span>
                 </div>
-                
-                <div class="result-image-container">
-                    <div class="scanner-horizontal"></div>
-                    <img src="{{ '/' + result_image }}" class="result-image" alt="AI Detection Results">
+                <div class="result-images-wrapper">
+                    <div class="image-box">
+                        <h3>Original Scan</h3>
+                        <img src="{{ '/' + original_image }}" class="result-image" alt="Original Lunar Surface">
+                    </div>
+                    <div class="image-box">
+                        <h3>AI Detected Craters</h3>
+                        <div class="result-image-container" style="position: relative; display: inline-block;">
+                            <div class="scanner-horizontal"></div>
+                            <img src="{{ '/' + result_image }}" class="result-image" alt="AI Detection Results">
+                            {% for crater in crater_data %}
+                            <div class="crater-tooltip-target" 
+                                 data-left="{{ (crater.x1 / img_width) * 100 }}"
+                                 data-top="{{ (crater.y1 / img_height) * 100 }}"
+                                 data-width="{{ ((crater.x2 - crater.x1) / img_width) * 100 }}"
+                                 data-height="{{ ((crater.y2 - crater.y1) / img_height) * 100 }}"
+                                 title="Crater #{{ crater.id }}&#10;Classification: {{ crater.size }}&#10;Diameter: {{ crater.diameter }}px&#10;Confidence: {{ crater.confidence }}">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
 
+                <div class="actions-panel" style="margin: 30px 0;">
+                    <a href="{{ '/' + result_image }}" download="lunar_detection_{{ filename }}" class="submit-btn" style="text-decoration: none; display: inline-flex;">
+                        <i class="fa-solid fa-download"></i> Download Detected Image
+                    </a>
+                </div>
                 <div class="info-cards">
                     <div class="info-card"><i class="fa-solid fa-microchip"></i> <span>AI Model: YOLOv8</span></div>
                     <div class="info-card"><i class="fa-solid fa-satellite-dish"></i> <span>Status: Verified</span></div>
                     <div class="info-card"><i class="fa-solid fa-bullseye"></i> <span>Confidence: High</span></div>
                 </div>
+                {% if uploaded %}
+                <div class="stats-panel">
+
+                        <h2>Crater Analysis</h2>
+
+                        <ul>
+
+                        <li>Total Craters: {{ stats.total }}</li>
+
+                        <li>Average Diameter: {{ stats.avg_diameter }} px</li>
+
+                        <li>Largest Crater: {{ stats.largest }} px</li>
+
+                        <li>Smallest Crater: {{ stats.smallest }} px</li>
+
+                        <li>Average Confidence: {{ stats.avg_conf }}</li>
+
+                        <li>Crater Density: {{ stats.density }}</li>
+
+                        <li>Processing Time: {{ stats.time }} sec</li>
+
+                        </ul>
+
+                        </div>
+                        
+                {% endif %}
+                <div class="size-distribution">
+
+                        <h3>Crater Size Distribution</h3>
+
+                        <ul>
+
+                        <li>Small: {{ stats.small }}</li>
+
+                        <li>Medium: {{ stats.medium }}</li>
+
+                        <li>Large: {{ stats.large }}</li>
+
+                        </ul>
+
+                        </div>
+
+                <table class="crater-table">
+
+                    <tr>
+                    <th>ID</th>
+                    <th>Diameter</th>
+                    <th>Confidence</th>
+                    <th>Size</th>
+                    </tr>
+
+                    {% for crater in crater_data %}
+
+                    <tr>
+
+                    <td>{{ crater.id }}</td>
+
+                    <td>{{ crater.diameter }} px</td>
+
+                    <td>{{ crater.confidence }}</td>
+
+                    <td>{{ crater.size }}</td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                    </table>
+
+
 
                 <a href="/" class="back-link"><i class="fa-solid fa-arrow-left"></i> Analyze Another Sector</a>
             </div>
