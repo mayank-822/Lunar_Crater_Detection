@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lunar Crater Detector</title>
+    <!-- FontAwesome for futuristic icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <div class="main-wrapper">
+        <div class="container">
+            
+            <h1>🌕 Lunar Crater Detector</h1>
+            
+            <form id="upload-form" method="POST" enctype="multipart/form-data">
+                <div class="upload-area" id="upload-area">
+                    <div class="scanner"></div>
+                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                    <input type="file" id="image-upload" name="image" accept="image/*" required>
+                    <label for="image-upload" class="file-label">
+                        <strong>Choose a lunar image</strong> or drag and drop it here
+                    </label>
+                    <div id="file-name" class="file-name"></div>
+                </div>
+
+                <button type="submit" id="submit-btn" class="submit-btn" disabled>
+                    <i class="fa-solid fa-satellite"></i> Scan for Craters
+                </button>
+
+                <div id="loading-indicator" class="loading-indicator">
+                    <div class="spinner"></div>
+                    <p id="loading-text" class="typing-cursor"></p>
+                </div>
+            </form>
+
+            {% if uploaded %}
+            <div class="results-section">
+                <div class="crater-count">
+                    Detected Craters: <span class="count-badge">{{ crater_count }}</span>
+                </div>
+                
+                <div class="result-image-container">
+                    <div class="scanner-horizontal"></div>
+                    <img src="{{ '/' + result_image }}" class="result-image" alt="AI Detection Results">
+                </div>
+
+                <div class="info-cards">
+                    <div class="info-card"><i class="fa-solid fa-microchip"></i> <span>AI Model: YOLOv8</span></div>
+                    <div class="info-card"><i class="fa-solid fa-satellite-dish"></i> <span>Status: Verified</span></div>
+                    <div class="info-card"><i class="fa-solid fa-bullseye"></i> <span>Confidence: High</span></div>
+                </div>
+
+                <a href="/" class="back-link"><i class="fa-solid fa-arrow-left"></i> Analyze Another Sector</a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- Interactive Space Canvas & Input Logic -->
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
