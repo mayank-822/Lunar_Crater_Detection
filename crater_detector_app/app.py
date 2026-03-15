@@ -21,7 +21,7 @@ os.makedirs(RESULT_FOLDER, exist_ok=True)
 os.makedirs(DATASET_FOLDER, exist_ok=True)
 
 from ultralytics import YOLO
-model = YOLO("model/best.pt")
+model = YOLO("model/last.pt")
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'}
 
