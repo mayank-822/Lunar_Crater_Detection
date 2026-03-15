@@ -432,6 +432,10 @@ def create_combined_region_map(reports):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    images = []
+    if os.path.exists(RESULT_FOLDER):
+        images = [f for f in os.listdir(RESULT_FOLDER) if (f.endswith(".jpg") or f.endswith(".png")) and not any(f.startswith(prefix) for prefix in ["heatmap_", "riskmap_", "chart_", "combined_"])]
+
     if request.method == "POST":
         files = request.files.getlist("image")
         reports = []
@@ -454,9 +458,11 @@ def index():
             
         combined_region = create_combined_region_map(reports)
             
-        return render_template("index.html", uploaded=True, reports=reports, summary=global_summary, combined_region=combined_region)
+        images = [os.path.basename(rep["result_image"]) for rep in reports]
+            
+        return render_template("index.html", uploaded=True, reports=reports, summary=global_summary, combined_region=combined_region, images=images)
 
-    return render_template("index.html", uploaded=False)
+    return render_template("index.html", uploaded=False, images=images)
 
 if __name__ == "__main__":
     app.run(debug=True)

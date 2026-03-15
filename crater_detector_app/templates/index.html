@@ -11,8 +11,8 @@
 </head>
 <body>
 
-    <nav class="app-nav" style="border-bottom: 2px solid #222;">
-        <div class="nav-links" style="display:flex; flex-wrap:wrap; justify-content:center; gap:15px; width:100%;">
+    <nav class="app-nav">
+        <div class="nav-links">
             <button class="nav-link active" onclick="switchPage('upload', event)">1. Satellite Image Upload</button>
             <button class="nav-link" onclick="switchPage('detection', event)" {{ 'disabled' if not uploaded else '' }}>2. AI Crater Detection</button>
             <button class="nav-link" onclick="switchPage('density', event)" {{ 'disabled' if not uploaded else '' }}>3. Terrain Analysis</button>
@@ -29,22 +29,22 @@
                 <div class="panel-header">
                     <div class="panel-header-left"><i class="fa-solid fa-satellite" style="color: var(--primary-color);"></i> STEP 1: SATELLITE IMAGE ACQUISITION</div>
                 </div>
-                <div class="panel-body" style="grid-template-columns: 1fr; justify-items:center;">
-                    <div class="dash-col" style="width:100%; max-width:600px;">
-                        <div class="hud-card upload-card mb-20" style="text-align: center; padding:40px; border-color:var(--primary-color);">
-                            <div class="hud-card-title mb-20" style="font-size:1rem;">UPLOAD LUNAR SATELLITE IMAGES</div>
+                <div class="panel-body center-layout">
+                    <div class="dash-col" style="width:100%; max-width:650px;">
+                        <div class="hud-card upload-card mb-20" style="text-align: center;">
+                            <div class="hud-card-title mb-20" style="justify-content:center; font-size:1rem;">UPLOAD LUNAR SATELLITE IMAGES</div>
                             
                             <form id="upload-form" method="POST" enctype="multipart/form-data">
-                                <div class="upload-area" id="upload-area" style="padding:40px 20px;">
+                                <div class="upload-area mb-20" id="upload-area">
                                     <i class="fa-solid fa-cloud-arrow-up mb-10" style="font-size: 3rem; color: #555;"></i>
                                     <input type="file" id="image-upload" name="image" accept="image/*" webkitdirectory directory multiple required>
                                     <label for="image-upload" class="file-label">
                                         <strong style="color: #fff; font-size:1.2rem;">SELECT SECTOR SCANS</strong> <br><br> (Drag & Drop multiple images for regional mapping)
                                     </label>
-                                    <div id="file-name" class="file-name" style="font-size:1rem; margin-top:20px;"></div>
+                                    <div id="file-name" class="file-name"></div>
                                 </div>
 
-                                <button type="submit" id="submit-btn" class="action-btn" style="padding:20px; font-size:1.2rem;" disabled>
+                                <button type="submit" id="submit-btn" class="action-btn" disabled>
                                     INITIATE NEURAL NETWORK
                                 </button>
                                 
@@ -82,15 +82,30 @@
                     <div class="panel-header-right">AI CORE: <span style="color: var(--status-color);">DETECTING CRATERS AUTOMATICALLY</span></div>
                 </div>
                 
-                <div class="panel-body" style="grid-template-columns: 1.5fr 1fr;">
+                <div class="panel-body two-cols">
                     {% if uploaded and reports %}
                     <div class="dash-col">
-                        <div class="feed-header mb-10">AI VISION OUTPUT // {{ reports[0].filename }}</div>
-                        <div class="feed-image-container" style="border:1px solid #444; min-height:500px;">
-                            <img src="{{ '/' + reports[0].result_image }}" class="feed-img" alt="Detection Map">
+                        <div class="feed-header mb-10" id="detection-filename-header">AI VISION OUTPUT // {{ reports[0].filename }}</div>
+                        <div class="feed-image-container">
+                            <img id="crater-image" src="{{ '/' + reports[0].result_image }}" class="feed-img" alt="Detection Map">
                             <div class="crosshair-center"></div>
                         </div>
-                        <div class="feed-footer">
+                        
+                        <!-- Slider Controls -->
+                        <div class="flex-row gap-20 mt-10" style="justify-content: center; align-items: center;">
+                            <button class="action-btn" style="width: auto; padding: 5px 15px; margin-top:0;" onclick="prevImage()"><i class="fa-solid fa-caret-left"></i> Prev</button>
+                            <div id="image-counter" class="metric-value" style="font-size: 1rem; color:#fff; font-family:var(--font-numbers);">Image 1 / {{ images|length }}</div>
+                            <button class="action-btn" style="width: auto; padding: 5px 15px; margin-top:0;" onclick="nextImage()">Next <i class="fa-solid fa-caret-right"></i></button>
+                        </div>
+
+                        <!-- Optional Thumbnail Preview -->
+                        <div class="thumbnails mt-10">
+                            {% for img in images %}
+                                <img src="/static/results/{{ img }}" onclick="setSliderImage({{ loop.index0 }})" style="width: 60px; height: 60px; object-fit: cover; cursor: pointer; border: 2px solid {% if loop.index0 == 0 %}var(--primary-color){% else %}transparent{% endif %}; transition: border-color 0.2s;" class="slider-thumb" id="thumb-{{ loop.index0 }}">
+                            {% endfor %}
+                        </div>
+
+                        <div class="feed-footer mt-10">
                             <div class="ff-item">
                                 <div class="ff-label">CRATERS DETECTED</div>
                                 <div class="ff-value">{{ reports[0].stats.total }}</div>
@@ -107,7 +122,7 @@
                             <div class="hud-card-title mb-10"><i class="fa-solid fa-database"></i> RAW BOUNDING BOX DATA</div>
                             <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:15px; line-height:1.4;">Live feed from neural network identifying bounds, bounding box dimensions, and surface morphology.</p>
                             
-                            <div style="flex-grow:1; max-height:400px; overflow-y:auto; border:1px solid #222;">
+                            <div class="table-wrapper">
                                 <table class="data-table">
                                     <thead>
                                         <tr>
@@ -132,7 +147,7 @@
                                 </table>
                             </div>
 
-                            <a href="{{ '/' + reports[0].csv }}" class="action-btn mt-20" style="text-align:center; text-decoration:none;"><i class="fa-solid fa-download"></i> EXPORT TO CSV</a>
+                            <a href="{{ '/' + reports[0].csv }}" class="action-btn mt-20" style="text-decoration:none;"><i class="fa-solid fa-download"></i> EXPORT TO CSV</a>
                         </div>
                     </div>
                     {% endif %}
@@ -151,7 +166,7 @@
                     {% if uploaded and reports %}
                     <div class="dash-col">
                         <div class="feed-header mb-10">CRATER DENSITY HEATMAP</div>
-                        <div class="feed-image-container" style="border:1px solid #444;">
+                        <div class="feed-image-container">
                             <img src="{{ '/' + reports[0].heatmap }}" style="width:100%;">
                         </div>
                         
@@ -192,14 +207,14 @@
                     <div class="panel-header-left"><i class="fa-solid fa-map" style="color: var(--primary-color);"></i> STEP 4: REGIONAL CRATER MAP (MULTI-IMAGE)</div>
                 </div>
                 
-                <div class="panel-body" style="grid-template-columns: 1fr; align-items:center;">
+                <div class="panel-body center-layout">
                     {% if combined_region and summary.images > 1 %}
                         <div class="dash-col">
                             <div class="feed-header mb-10" style="text-align:center;">COMBINED MULTI-IMAGE ANALYSIS</div>
                             <div class="hud-card mb-20" style="border-color:var(--primary-color); text-align:center;">
                                 <div class="metric-value" style="font-size:1.2rem; color:var(--primary-color);">{{ summary.images }} SCANS STITCHED SUCCESSFULLY</div>
                             </div>
-                            <div class="feed-image-container" style="border:1px solid #222; max-width: 800px; margin: 0 auto; display:block;">
+                            <div class="feed-image-container" style="max-width: 800px; margin: 0 auto; display:block;">
                                 <img src="{{ '/' + combined_region.map_image }}" style="width:100%; height:auto;">
                             </div>
                             
@@ -220,8 +235,8 @@
                             </div>
                             
                             <div class="hud-card mt-20" style="max-width:800px; margin: 20px auto; text-align:center;">
-                                <div class="hud-card-title">REGIONAL DATA</div>
-                                <a href="{{ '/' + combined_region.csv }}" class="action-btn" style="margin-top:5px;"><i class="fa-solid fa-download"></i> EXPORT CONTINUOUS REGION CSV</a>
+                                <div class="hud-card-title pb-10">REGIONAL DATA</div>
+                                <a href="{{ '/' + combined_region.csv }}" class="action-btn" style="text-decoration:none;"><i class="fa-solid fa-download"></i> EXPORT CONTINUOUS REGION CSV</a>
                             </div>
                         </div>
                     {% elif uploaded %}
@@ -244,18 +259,18 @@
                     <div class="panel-header-left"><i class="fa-solid fa-bullseye" style="color: var(--status-color);"></i> STEP 5: SAFE LANDING SITE SELECTION</div>
                 </div>
                 
-                <div class="panel-body" style="grid-template-columns: 1.5fr 1fr;">
+                <div class="panel-body two-cols">
                     {% if uploaded and reports %}
                     <div class="dash-col">
                         <div class="feed-header mb-10">LANDING SAFETY MAP (INTERACTIVE EXPLORER)</div>
-                        <div class="feed-image-container img-magnifier-container" style="border:1px solid #444; position:relative;">
+                        <div class="feed-image-container img-magnifier-container">
                             {% if combined_region and summary.images > 1 %}
                                 <img id="safety-map-img" src="{{ '/' + combined_region.riskmap }}" style="width:100%; display:block;">
                             {% else %}
                                 <img id="safety-map-img" src="{{ '/' + reports[0].riskmap }}" style="width:100%; display:block;">
                             {% endif %}
                             <!-- Legend box superimposed over map -->
-                            <div style="position:absolute; bottom:20px; right:20px; background:rgba(0,0,0,0.9); padding:15px; border:1px solid #444;">
+                            <div class="risk-legend">
                                 <div class="hud-card-title mb-10" style="color:#fff;">RISK LEGEND</div>
                                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
                                     <div style="width:20px; height:20px; background:#00FF00;"></div><span style="font-size:0.8rem; color:#fff;">LOW RISK (Smooth)</span>
@@ -299,6 +314,8 @@
         </div>
 
     </div>
+
+
 
     <!-- Script Handling -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
@@ -384,6 +401,64 @@
         window.addEventListener('load', () => {
             setTimeout(() => { magnify("safety-map-img", 3); }, 500);
         });
+
+        // --- Crater Detection Results Slider Logic ---
+        {% if images and images|length > 0 %}
+            let sliderImages = {{ images | tojson }};
+            let currentIndex = 0;
+
+            function updateSlider() {
+                if (sliderImages.length === 0) return;
+                let imgEl = document.getElementById("crater-image");
+                if (imgEl) imgEl.src = "/static/results/" + sliderImages[currentIndex];
+                
+                let counterEl = document.getElementById("image-counter");
+                if (counterEl) counterEl.innerText = "Image " + (currentIndex + 1) + " / " + sliderImages.length;
+                
+                let headerEl = document.getElementById("detection-filename-header");
+                if (headerEl) headerEl.innerText = "AI VISION OUTPUT // " + sliderImages[currentIndex];
+                
+                // Highlight active thumbnail
+                document.querySelectorAll('.slider-thumb').forEach((thumb, index) => {
+                    if (index === currentIndex) {
+                        thumb.style.borderColor = 'var(--primary-color)';
+                    } else {
+                        thumb.style.borderColor = 'transparent';
+                    }
+                });
+            }
+
+            function nextImage() {
+                if (sliderImages.length === 0) return;
+                currentIndex = (currentIndex + 1) % sliderImages.length;
+                updateSlider();
+            }
+
+            function prevImage() {
+                if (sliderImages.length === 0) return;
+                currentIndex = (currentIndex - 1 + sliderImages.length) % sliderImages.length;
+                updateSlider();
+            }
+
+            function setSliderImage(index) {
+                if (index >= 0 && index < sliderImages.length) {
+                    currentIndex = index;
+                    updateSlider();
+                }
+            }
+
+            document.addEventListener("keydown", function(e) {
+                // Only navigate if detection page is active to avoid interfering with other pages
+                const detectionPage = document.getElementById('page-detection');
+                if (detectionPage && detectionPage.classList.contains('active')) {
+                    if (e.key === "ArrowRight") {
+                        nextImage();
+                    } else if (e.key === "ArrowLeft") {
+                        prevImage();
+                    }
+                }
+            });
+        {% endif %}
     </script>
 </body>
 </html>
