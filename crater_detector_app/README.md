@@ -36,3 +36,12 @@ To execute this analysis pipeline, install the following dependencies:
 - **Backend:** Flask, Python
 - **ML / Vision:** Ultralytics YOLO, OpenCV, Matplotlib
 - **Frontend / Styling:** Vanilla HTML5, CSS3, Javascript (Custom space-themed web-aesthetics with glassmorphism).
+
+
+## Model _Training 
+The model is trained on the dataset taken from kaggle which is NASA based 
+-**Link Of Dataset** https://www.kaggle.com/datasets/riccardolagrassa/lu3m6tgt
+-**Precision:** 88.05 %
+-**Recall:** 85.16 %
+-**mAP50:** 93.39 %
+-**mAP50**-95: 79.37 %
