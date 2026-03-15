@@ -108,11 +108,11 @@
                         <div class="feed-footer mt-10">
                             <div class="ff-item">
                                 <div class="ff-label">CRATERS DETECTED</div>
-                                <div class="ff-value">{{ reports[0].stats.total }}</div>
+                                <div class="ff-value" id="craters-total-val">{{ reports[0].stats.total }}</div>
                             </div>
                             <div class="ff-item" style="text-align: right;">
                                 <div class="ff-label">NETWORK CONFIDENCE</div>
-                                <div class="ff-value" style="color: var(--status-color);">{{ reports[0].stats.avg_conf }}</div>
+                                <div class="ff-value" id="craters-conf-val" style="color: var(--status-color);">{{ reports[0].stats.avg_conf }}</div>
                             </div>
                         </div>
                     </div>
@@ -132,7 +132,7 @@
                                             <th>CONFIDENCE</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="crater-table-body">
                                         {% for crater in reports[0].crater_data %}
                                         <tr>
                                             <td style="color:#fff; font-family:var(--font-numbers);">#{{ crater.id }}</td>
@@ -147,7 +147,7 @@
                                 </table>
                             </div>
 
-                            <a href="{{ '/' + reports[0].csv }}" class="action-btn mt-20" style="text-decoration:none;"><i class="fa-solid fa-download"></i> EXPORT TO CSV</a>
+                            <a href="{{ '/' + reports[0].csv }}" id="export-csv-btn" class="action-btn mt-20" style="text-decoration:none;"><i class="fa-solid fa-download"></i> EXPORT TO CSV</a>
                         </div>
                     </div>
                     {% endif %}
@@ -405,6 +405,7 @@
         // --- Crater Detection Results Slider Logic ---
         {% if images and images|length > 0 %}
             let sliderImages = {{ images | tojson }};
+            let sliderReports = {{ reports | tojson if reports else '[]' }};
             let currentIndex = 0;
 
             function updateSlider() {
@@ -417,6 +418,34 @@
                 
                 let headerEl = document.getElementById("detection-filename-header");
                 if (headerEl) headerEl.innerText = "AI VISION OUTPUT // " + sliderImages[currentIndex];
+                
+                // Try pulling report dynamically
+                if (sliderReports && sliderReports.length > currentIndex) {
+                    let rep = sliderReports[currentIndex];
+                    
+                    let totalCratersEl = document.getElementById("craters-total-val");
+                    if (totalCratersEl) totalCratersEl.innerText = rep.stats.total;
+
+                    let confEl = document.getElementById("craters-conf-val");
+                    if (confEl) confEl.innerText = rep.stats.avg_conf;
+
+                    let csvBtn = document.getElementById("export-csv-btn");
+                    if (csvBtn) csvBtn.href = "/" + rep.csv;
+
+                    let tableBody = document.getElementById("crater-table-body");
+                    if (tableBody) {
+                        let html = '';
+                        rep.crater_data.forEach(c => {
+                            html += `<tr>
+                                        <td style="color:#fff; font-family:var(--font-numbers);">#${c.id}</td>
+                                        <td>${c.diameter} px</td>
+                                        <td style="font-size: 0.7rem;">${c.morphology}</td>
+                                        <td><div style="color: var(--primary-color);">${c.confidence}</div></td>
+                                     </tr>`;
+                        });
+                        tableBody.innerHTML = html;
+                    }
+                }
                 
                 // Highlight active thumbnail
                 document.querySelectorAll('.slider-thumb').forEach((thumb, index) => {
