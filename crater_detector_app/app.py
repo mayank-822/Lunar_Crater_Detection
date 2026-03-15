@@ -23,6 +23,11 @@ os.makedirs(DATASET_FOLDER, exist_ok=True)
 from ultralytics import YOLO
 model = YOLO("model/best.pt")
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def calculate_iou(box1, box2):
     x_left = max(box1[0], box2[0])
     y_top = max(box1[1], box2[1])
@@ -35,9 +40,109 @@ def calculate_iou(box1, box2):
     intersection_area = (x_right - x_left) * (y_bottom - y_top)
     box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
     box2_area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    iou = intersection_area / float(box1_area + box2_area - intersection_area)
+    return iou
 
-    return intersection_area / float(box1_area + box2_area - intersection_area)
+def generate_advanced_safety_map(image_bgr, craters, tile_size=128):
+    h, w = image_bgr.shape[:2]
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    tiles_y = h // tile_size
+    tiles_x = w // tile_size
+    
+    if tiles_y == 0 or tiles_x == 0:
+        return image_bgr
 
+    metrics = []
+    
+    for ty in range(tiles_y):
+        for tx in range(tiles_x):
+            x1 = tx * tile_size
+            y1 = ty * tile_size
+            x2 = x1 + tile_size
+            y2 = y1 + tile_size
+            
+            tile_area = tile_size * tile_size
+            tile_gray = gray[y1:y2, x1:x2]
+            
+            tile_craters = []
+            for c in craters:
+                cx, cy = c.get('gx', c.get('x')), c.get('gy', c.get('y'))
+                if x1 <= cx < x2 and y1 <= cy < y2:
+                    tile_craters.append(c)
+                    
+            crater_density = len(tile_craters) / tile_area
+            diams = [c.get('diameter', 0) for c in tile_craters]
+            avg_diameter = float(np.mean(diams)) if len(diams) > 0 else 0.0
+            
+            roughness = float(np.std(tile_gray))
+            mean_intensity = float(np.mean(tile_gray))
+            
+            metrics.append({
+                'tx': tx, 'ty': ty, 'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+                'crater_density': crater_density, 'avg_diameter': avg_diameter,
+                'roughness': roughness, 'intensity': mean_intensity
+            })
+            
+    if not metrics:
+        return image_bgr
+
+    max_dens = max(m['crater_density'] for m in metrics) or 1.0
+    max_diam = max(m['avg_diameter'] for m in metrics) or 1.0
+    max_rough = max(m['roughness'] for m in metrics) or 1.0
+    
+    for m in metrics:
+        norm_density = m['crater_density'] / max_dens
+        norm_diameter = m['avg_diameter'] / max_diam
+        norm_roughness = m['roughness'] / max_rough
+        
+        score = 0.5 * norm_density + 0.3 * norm_diameter + 0.2 * norm_roughness
+        
+        maria_threshold = 80
+        if m['intensity'] < maria_threshold:
+            score *= 0.7 
+            
+        m['safety_score'] = score
+        
+    scores = [m['safety_score'] for m in metrics]
+    p5 = np.percentile(scores, 5)
+    p20 = np.percentile(scores, 20)
+    
+    grid = np.zeros((tiles_y, tiles_x), dtype=int)
+    overlay = np.zeros_like(image_bgr)
+    
+    for m in metrics:
+        s = m['safety_score']
+        if s <= p5:
+            m['color'] = (0, 255, 0) # GREEN
+            grid[m['ty'], m['tx']] = 2
+        elif s <= p20:
+            m['color'] = (0, 255, 255) # YELLOW
+            grid[m['ty'], m['tx']] = 1
+        else:
+            m['color'] = (0, 0, 255) # RED
+            grid[m['ty'], m['tx']] = 0
+            
+        cv2.rectangle(overlay, (m['x1'], m['y1']), (m['x2'], m['y2']), m['color'], -1)
+        
+    binary_green = np.uint8(grid == 2)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_green, connectivity=4)
+    
+    candidates = []
+    for i in range(1, num_labels):
+        if stats[i, cv2.CC_STAT_AREA] >= 4:
+            bx = stats[i, cv2.CC_STAT_LEFT]
+            by = stats[i, cv2.CC_STAT_TOP]
+            bw = stats[i, cv2.CC_STAT_WIDTH]
+            bh = stats[i, cv2.CC_STAT_HEIGHT]
+            candidates.append((bx*tile_size, by*tile_size, bw*tile_size, bh*tile_size))
+            
+    blended = cv2.addWeighted(overlay, 0.4, image_bgr, 0.6, 0)
+    
+    for i, (x, y, w, h) in enumerate(candidates):
+        cv2.rectangle(blended, (x, y), (x+w, y+h), (255, 255, 255), 3)
+        cv2.putText(blended, f"LZ-{i+1}", (x+5, y+25), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+        
+    return blended
 def process_image(upload_path, filename):
     start_time = time.time()
     results = model(upload_path)
@@ -168,10 +273,14 @@ def process_image(upload_path, filename):
     heatmap_norm = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
     heatmap_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_JET)
     cv2.imwrite(heatmap_path, cv2.addWeighted(img, 0.5, heatmap_color, 0.5, 0))
-    
-    # Risk Map (Similar but thresholded/inverted color scheme)
-    risk_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_AUTUMN)
-    cv2.imwrite(riskmap_path, cv2.addWeighted(img, 0.4, risk_color, 0.6, 0))
+    # Advanced Landing Safety Map
+    advanced_riskmap = generate_advanced_safety_map(img, crater_data, tile_size=64)
+    if advanced_riskmap is not None:
+        cv2.imwrite(riskmap_path, advanced_riskmap)
+    else:
+        # Fallback if generation failed
+        risk_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_AUTUMN)
+        cv2.imwrite(riskmap_path, cv2.addWeighted(img, 0.4, risk_color, 0.6, 0))
     
     # Chart
     plt.figure(figsize=(6, 4))
@@ -214,6 +323,9 @@ def create_combined_region_map(reports):
     combined_csv_data = [["Global_ID", "Original_Image", "X_Center_Global", "Y_Center_Global", "Diameter", "Depth_Est", "Morphology", "Confidence", "Quadrant"]]
     
     global_id = 1
+    total_area = 0
+    size_counts = {"Small": 0, "Medium": 0, "Large": 0}
+
     for idx, rep in enumerate(reports):
         row = idx // cols
         col = idx % cols
@@ -227,7 +339,8 @@ def create_combined_region_map(reports):
         
         scale_x = cell_w / rep["width"]
         scale_y = cell_h / rep["height"]
-        
+        total_area += (rep["width"] * rep["height"])
+
         for c in rep["crater_data"]:
             gx = c["x"] * scale_x + offset_x
             gy = c["y"] * scale_y + offset_y
@@ -239,6 +352,13 @@ def create_combined_region_map(reports):
                 "gx": gx, "gy": gy, "diameter": gw
             })
             
+            size_class = c.get("size", "Small")
+            if size_class in size_counts:
+                size_counts[size_class] += 1
+            elif size_class == "small": size_counts["Small"] += 1
+            elif size_class == "medium": size_counts["Medium"] += 1
+            else: size_counts["Large"] += 1
+
             combined_csv_data.append([global_id, rep["filename"], round(gx, 2), round(gy, 2), round(gw, 2), c["depth"], c["morphology"], c["confidence"], c["quadrant"]])
             global_id += 1
 
@@ -263,19 +383,51 @@ def create_combined_region_map(reports):
     
     heatmap = cv2.GaussianBlur(heatmap, (51, 51), 0)
     heatmap_norm = cv2.normalize(heatmap, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    
+    # Combined Heatmap
     heatmap_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_JET)
     combined_heatmap_img = cv2.addWeighted(combined_img, 0.5, heatmap_color, 0.5, 0)
     cv2.imwrite(combined_heatmap_path, combined_heatmap_img)
     
+    # Combined Risk Map
+    combined_riskmap_filename = "combined_riskmap_" + str(uuid.uuid4()) + ".jpg"
+    combined_riskmap_path = os.path.join(RESULT_FOLDER, combined_riskmap_filename)
+    
+    advanced_combined_riskmap = generate_advanced_safety_map(combined_img, combined_craters, tile_size=128)
+    if advanced_combined_riskmap is not None:
+        cv2.imwrite(combined_riskmap_path, advanced_combined_riskmap)
+    else:
+        risk_color = cv2.applyColorMap(heatmap_norm, cv2.COLORMAP_AUTUMN)
+        cv2.imwrite(combined_riskmap_path, cv2.addWeighted(combined_img, 0.4, risk_color, 0.6, 0))
+
     with open(combined_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerows(combined_csv_data)
+        
+    regional_chart_filename = "combined_chart_" + str(uuid.uuid4()) + ".jpg"
+    regional_chart_path = os.path.join(RESULT_FOLDER, regional_chart_filename)
+    
+    plt.figure(figsize=(6, 4))
+    sizes = [size_counts["Small"], size_counts["Medium"], size_counts["Large"]]
+    labels = ["Small", "Medium", "Large"]
+    plt.bar(labels, sizes, color=['#4e6ef2', '#8a9fed', '#2b48bd'])
+    plt.title("Regional Crater Size Distribution")
+    plt.ylabel("Count")
+    plt.tight_layout()
+    plt.savefig(regional_chart_path)
+    plt.close()
+
+    regional_density = round((len(combined_craters) / total_area) * 1000000, 2) if total_area > 0 else 0
         
     return {
         "map_image": combined_map_path,
         "heatmap_image": combined_heatmap_path,
         "csv": combined_csv_path,
-        "total_craters": len(combined_craters)
+        "total_craters": len(combined_craters),
+        "regional_density": regional_density,
+        "size_counts": size_counts,
+        "chart": regional_chart_path,
+        "riskmap": combined_riskmap_path
     }
 
 @app.route("/", methods=["GET", "POST"])
@@ -286,7 +438,7 @@ def index():
         global_summary = { "images": 0, "total_craters": 0, "avg_density": 0 }
         
         for file in files:
-            if file and file.filename != '':
+            if file and file.filename != '' and allowed_file(file.filename):
                 filename = str(uuid.uuid4()) + ".jpg"
                 upload_path = os.path.join(UPLOAD_FOLDER, filename)
                 file.save(upload_path)

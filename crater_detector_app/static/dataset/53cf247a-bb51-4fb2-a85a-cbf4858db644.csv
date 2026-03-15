@@ -1,0 +1,4 @@
+ID,X_Center,Y_Center,Diameter,Depth_Est,Morphology,Confidence,Quadrant
+1,284.63,114.81,36.23,7.25,Complex,0.46,NE
+2,282.61,287.26,11.79,2.36,Simple,0.45,SE
+3,255.79,23.31,15.99,3.2,Simple,0.28,NE
